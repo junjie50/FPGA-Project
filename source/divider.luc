@@ -1,0 +1,10 @@
+module divider (
+    input a[16],
+    input b[16],
+    output div[16]
+  ) {
+
+  always {
+    div = a/b;
+  }
+}

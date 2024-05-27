@@ -1,0 +1,44 @@
+pin clk CLOCK;
+clock clk 100MHz;
+
+pin rst_n RESET;
+
+// User led
+pin game_leds[0] B49;
+pin game_leds[1] B48;
+pin game_leds[2] B46;
+pin game_leds[3] B45;
+pin game_leds[4] B43;
+pin game_leds[5] B42;
+pin game_leds[6] B40;
+pin game_leds[7] B39;
+pin game_leds[8] B37;
+pin game_leds[9] B36;
+pin game_leds[10] B34;
+pin game_leds[11] B33;
+
+
+// Game buttons input
+pin game_buttons[0] B2 pulldown; //p2 sci
+pin game_buttons[1] B3 pulldown; //p2 paper
+pin game_buttons[2] B5 pulldown; //p2 rock
+pin game_buttons[3] B6 pulldown; //p1 sci
+pin game_buttons[4] B8 pulldown; //1 paper
+pin game_buttons[5] B9 pulldown; //1 rock
+pin game_buttons[6] B11 pulldown; //defend
+pin game_buttons[7] B12 pulldown; //attack
+pin game_buttons[8] B14 pulldown; //reset
+
+
+// flip the Tx/Rx lines
+pin usb_rx USB_TX;
+pin usb_tx USB_RX;
+
+// 7 seg connections
+pin io_seg[0] A27;
+pin io_seg[1] A28;
+pin io_seg[2] A30;
+pin io_seg[3] A31;
+pin io_seg[4] A33;
+pin io_seg[5] A34;
+pin io_seg[6] A36;

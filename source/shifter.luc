@@ -1,0 +1,90 @@
+module shifter (
+    input a[16],
+    input b[4],
+    input alufn_signal[6],
+    output shift[16]
+  ) {
+  x_bit_left_shifter left8(#SHIFT(8));
+  x_bit_left_shifter left4(#SHIFT(4));
+  x_bit_left_shifter left2(#SHIFT(2));
+  x_bit_left_shifter left1(#SHIFT(1));
+  sig tmp_a[16];
+  sig pad;
+  var i;
+  always {
+    // Invert the input if necessary for right operations.
+    // For SHA, change the padding to the sign bit.
+    case(alufn_signal[1:0]){
+      b00: // SHL
+        tmp_a = a;
+        pad = b0;
+      b01: // SHR
+        for (i = 0; i < 16; i++) {
+            tmp_a[i]=a[15-i];
+        }
+        pad = b0;
+      default: // SHA
+        for (i = 0; i < 16; i++) {
+          tmp_a[i]=a[15-i];
+        }
+        pad = a[15]; // padding is the sign bit.
+    }
+     
+    // shift 8
+    left8.pad=pad;
+    left8.a=tmp_a;
+    case(b[3]){
+      1:
+        left8.shift=1;
+      default:
+        left8.shift=0;
+    }
+    
+    // shift 4
+    left4.pad=pad;
+    left4.a=left8.out;
+    case(b[2]){
+      1:
+        left4.shift=1;
+      default:
+        left4.shift=0;
+    }
+    
+    // shift 2
+    left2.pad=pad;
+    left2.a=left4.out;
+    case(b[1]){
+      1:
+        left2.shift=1;
+      default:
+        left2.shift=0;
+    }
+    
+    // shift 1
+    left1.pad=pad;
+    left1.a=left2.out;
+    case(b[0]){
+      1:
+        left1.shift=1;
+      default:
+        left1.shift=0;
+    }
+    
+    
+    // OUTPUT 
+    // Invert the output for the shifter in the event of right shifts.
+    case(alufn_signal[1:0]){
+    b00: // SHL
+      shift = left1.out;
+    b01: // SHR
+      for (i = 0; i < 16; i++) {
+        shift[i]=left1.out[15-i];
+      }
+    default: // SHA
+      for (i = 0; i < 16; i++) {
+        shift[i]=left1.out[15-i];
+      }
+    }
+    
+  }
+}

@@ -1,0 +1,80 @@
+module alu (
+    input a[16],
+    input b[16],
+    input alufn_signal[6],
+    output out[16],
+    output z,
+    output v,
+    output n
+  ) {
+  adder adder;
+  boolean boolean;
+  shifter shifter;
+  compare compare; 
+  multiplier multiplier;
+  modulus modulus2(#POWER(1));
+  divider divider;
+  check_winner check_winner;
+  
+  always {
+    z = adder.z;
+    v = adder.v;
+    n = adder.n;
+    adder.a = a;
+    adder.b = b;
+    adder.alufn_signal = alufn_signal;
+    
+    boolean.a = a;
+    boolean.b = b;
+    boolean.alufn_signal = alufn_signal;
+    
+    shifter.a = a;
+    shifter.b = b[3:0];
+    shifter.alufn_signal = alufn_signal;
+    
+    compare.z = adder.z;
+    compare.v = adder.v;
+    compare.n = adder.n;
+    compare.alufn_signal = alufn_signal;
+    
+    multiplier.a = a;
+    multiplier.b = b;
+    
+    modulus2.a = a;
+    
+    divider.a = a;
+    divider.b = b;
+    
+    check_winner.state_a = a[1:0];
+    check_winner.state_b = b[1:0];
+    
+    // Control unit for output
+    case(alufn_signal[5:4]){
+      b00:
+        if(alufn_signal[2:0]==3b010){
+          out = multiplier.mul;
+        }
+        else if(alufn_signal[2:0]==3b011){
+          out = modulus2.mod;
+        }
+        else if(alufn_signal[2:0]==3b100){
+          out = divider.div;
+        }
+        else{
+          out = adder.out;
+        }
+      b01:
+        out = boolean.bool;
+      b10:
+        out = shifter.shift;
+      b11:
+        if(alufn_signal == b111111){
+          out = c{14b0, check_winner.out};
+        }
+        else{
+          out = c{15b0, compare.cmp};
+        }
+      default:
+        out = 0;
+  }
+}

@@ -1,0 +1,45 @@
+module adder (
+    input a[16],
+    input b[16],
+    input alufn_signal[6],
+    output out[16],
+    output z,
+    output v,
+    output n
+  ) {
+  rca rca;
+  sig xb[16];
+  var i;
+  always {
+    // Creating the xb.
+    for(i=0;i<16;i++){
+      xb[i]=alufn_signal[0]^b[i];
+    }
+    
+    // Connect to the RCA.
+    rca.a = a;
+    rca.b = xb;
+    rca.ci = alufn_signal[0];
+    
+    // Using reduction to or all the rca.s. 0 indicates all 0 in the rca.s.
+    case(|rca.s){
+      0:
+        z=1;
+      default:
+        z=0;
+    }
+    
+    // Overflow.
+    v = a[15]&xb[15]&(~rca.s[15]) | (~a[15])&(~xb[15])&rca.s[15];
+    
+    // Negative.
+    case(rca.s[15]){
+      01:
+        n=1;
+      default:
+        n=0;
+    }
+    
+    out=rca.s;
+  }
+}

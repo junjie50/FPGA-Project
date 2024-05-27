@@ -1,0 +1,14 @@
+module fa (
+    input a, 
+    input b, 
+    input ci,
+    output so,
+    output co
+  ) {
+  sig a_xor_b;
+  always {
+    a_xor_b = a ^ b;
+    so = a_xor_b ^ ci;
+    co = a&b | ci&(a_xor_b);
+  }
+}

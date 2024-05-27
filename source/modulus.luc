@@ -1,0 +1,13 @@
+// Only for even numbers
+module modulus #(
+  // parameter declaration, to be set during module instantiation
+  // default value given is 8
+  POWER = 2 : POWER > -1 & POWER < 4
+  )(
+    input a[16],  
+    output mod[16]
+  ) {
+  always {
+    mod[POWER-1:0]=a[POWER-1:0];
+  }
+}

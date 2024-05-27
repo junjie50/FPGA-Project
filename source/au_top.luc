@@ -1,0 +1,60 @@
+module au_top (
+    input clk,              // 100MHz clock
+    input rst_n,            // reset button (active low)
+    input usb_rx,           // USB->Serial input
+    output usb_tx,          // USB->Serial output
+    
+    // Game Io
+    input game_buttons[9],
+    output io_seg [7],      // 7-segment LEDs on IO Shield (ANODE)
+    output game_leds[12]
+  ) {
+  
+  sig rst;                                  // reset signal
+  fsm_beta game_beta(.clk(clk), .rst(rst)); // Beta game controller
+  
+  .clk(clk) {
+    // The reset conditioner is used to synchronize the reset signal to the FPGA
+    // clock. This ensures the entire FPGA comes out of reset at the same time.
+    reset_conditioner reset_cond;
+    button_conditioner button_conditioner[9]; // this is to debounce the button signals
+    edge_detector edge_detector[9](#RISE(1), #FALL(0));
+  }
+  
+ 
+  
+  always {
+    reset_cond.in = ~rst_n;   // input raw inverted reset signal
+    rst = reset_cond.out;     // conditioned reset
+    
+    // Conditioner for game button inputs.
+    button_conditioner.in = game_buttons; 
+    edge_detector.in = button_conditioner.out;
+    usb_tx = usb_rx;
+    
+    
+    // LINK INPUT
+    game_beta.p2_scissors_button = edge_detector.out[0];
+    game_beta.p2_paper_button = edge_detector.out[1];
+    game_beta.p2_rock_button = edge_detector.out[2];
+    game_beta.p1_scissors_button = edge_detector.out[3];
+    game_beta.p1_paper_button = edge_detector.out[4];
+    game_beta.p1_rock_button = edge_detector.out[5];
+    game_beta.defend_button = edge_detector.out[6];
+    game_beta.attack_button = edge_detector.out[7];
+    game_beta.restart_button = edge_detector.out[8];
+    
+    
+    // LINK OUTPUT
+    game_leds[0] = game_beta.p2_scissors_led;
+    game_leds[1] = game_beta.p2_paper_led;
+    game_leds[2] = game_beta.p2_rock_led;
+    game_leds[3] = game_beta.p1_scissors_led;
+    game_leds[4] = game_beta.p1_paper_led;
+    game_leds[5] = game_beta.p1_rock_led;
+    game_leds[8:6] = game_beta.p2_hp;
+    game_leds[11:9] = game_beta.p1_hp;
+    
+    // Link 7seg
+    io_seg = ~game_beta.seven_seg_out;       
+}

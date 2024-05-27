@@ -1,0 +1,50 @@
+module multiplier (
+    input a[16],
+    input b[16],
+    output mul[16]
+  ) {
+  fa fa[120];
+  var prev_row_ind;
+  var curr_row_ind;
+  var i;
+  var j;
+  always {
+    // Top right of the multiplier.
+    mul[0]=b[0]&a[0];
+    curr_row_ind=0;
+    
+    // First row of FAs.
+    for(i=0;i<15;i++){
+      fa.a[curr_row_ind+i]=a[i]&b[1];
+      fa.b[curr_row_ind+i]=a[i+1]&b[0];
+      
+      if(i==0){
+        fa.ci[curr_row_ind]=0;
+        mul[1]=fa.so[curr_row_ind];
+      }
+      else{
+        fa.ci[curr_row_ind+i]=fa.co[curr_row_ind+i-1];
+      }
+    }
+    
+    // Second row of FAs onwards.
+    curr_row_ind=15;
+    prev_row_ind=0;
+    for(j=2;j<16;j++){
+      for(i=0;i<16-j;i++){
+        if(i==0) {
+          fa.ci[curr_row_ind]=0;
+          mul[j]=fa.so[curr_row_ind];
+        }
+        else{
+          fa.ci[curr_row_ind+i]=fa.co[curr_row_ind+i-1];
+        }
+        
+        fa.a[curr_row_ind+i]=b[j]&a[i];
+        fa.b[curr_row_ind+i]=fa.so[prev_row_ind+i+1];
+      }
+      prev_row_ind=curr_row_ind;
+      curr_row_ind=curr_row_ind+i;
+    }
+  }
+}

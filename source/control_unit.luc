@@ -1,0 +1,548 @@
+module control_unit (
+    input clk,  // clock
+    input rst,  // reset
+    input st, // slow timer (or should it be just integrated here?)
+    input attack_button,
+    input restart_button,
+    input defend_button,
+    input p1_rock_button,
+    input p1_paper_button,
+    input p1_scissors_button,
+    input p2_rock_button,
+    input p2_paper_button,
+    input p2_scissors_button,
+    input rb_data[16], // from regfile_unit
+
+    // Control Signals (for regfile_unit):
+    output we,
+    output ra[4],
+    output rb[4],
+    output rc[4],
+    output asel[3],
+    output bsel[3],
+    output wdsel[2],
+    output alufn[6],
+    output end_game,
+    output show_choice,
+    output end_round_idle
+  ) {
+  
+  // Game state FSM:
+  fsm game(.clk(clk), .rst(rst)) = {GAME_OVER,USER_SELECTION_IDLE,P1_INPUT_ROCK,P1_INPUT_PAPER,
+  P1_INPUT_SCISSORS,P2_INPUT_ROCK,P2_INPUT_PAPER,P2_INPUT_SCISSORS,CHECK_TIMER,BRANCH_TIMER,DECREASE_TIMER,
+    P1_CHECK,BRANCH_P1CHECK,P1_VALID_P2_CHECK,P1_INVALID_P2_CHECK,BRANCH_P1VALID_P2CHECK,BRANCH_P1INVALID_P2CHECK,
+    CONTEST,CHECK_WINNER,BRANCH_CHECK_WINNER,P1_LOST_ROUND,P2_LOST_ROUND,ROUND_OVER,CHECK_P1_0HP,CHECK_P2_0HP,
+    BRANCH_P1_HP,BRANCH_P2_HP,P1_WIN_GAME,P2_WIN_GAME,RESET_P1HP,RESET_P2HP,RESET_OUTCOME,
+    RESET_P1STATE,RESET_P2STATE,RESET_TIMER,START_TIMER,POST_ROUND_IDLE, DECREASE_POST_ROUND_TIMER,
+    CHECK_POST_ROUND_TIMER, BRANCH_POST_ROUND_TIMER, ATTACK_BUTTON, DEFEND_BUTTON, TIMER_BUFFER_START};
+    
+  // ALUFN OPCODE:
+  const ADD = 6b000000;
+  const SUB = 6b000001;
+  const COMPEQ = 6b110011;
+  const CMPLT = 6b110101;
+  const CHECKWINNER = 6b111111; // TODO: add new operation to ALU
+  
+  
+  always {
+  
+    // TODO: Tie is only checked AFTER attack/defend button is pressed
+    // Currently can't handle ties
+    // Need to change FSM diagram
+  
+    // Initialize outputs here to silence warning;
+    we = b0;
+    ra = h0;
+    rb = h0;
+    rc = h0;
+    asel = b000; 
+    bsel = b000;
+    wdsel = b00;
+    alufn = ADD;
+    end_game = 0;
+    show_choice = 0;
+    end_round_idle = 0;
+    
+    // GAME FSM LOGIC //
+    case (game.q){
+      
+      // BLACK STATES //
+      game.USER_SELECTION_IDLE:
+        game.d = game.USER_SELECTION_IDLE; // Default loop-back
+        if (p1_rock_button) {
+          game.d = game.P1_INPUT_ROCK;
+        }
+        if (p1_paper_button) {
+          game.d = game.P1_INPUT_PAPER;
+        }
+        if (p1_scissors_button) {
+          game.d = game.P1_INPUT_SCISSORS;
+        }
+        if (p2_rock_button) {
+          game.d = game.P2_INPUT_ROCK;
+        }
+        if (p2_paper_button) {
+          game.d = game.P2_INPUT_PAPER;
+        }
+        if (p2_scissors_button) {
+          game.d = game.P2_INPUT_SCISSORS;
+        }
+        if (st) { // 1 second has passed
+          game.d = game.DECREASE_TIMER;
+        }
+  
+      game.P1_INPUT_ROCK: // Player 1 pressed Rock
+        alufn = ADD;
+        asel = 3b010; // 0
+        bsel = 3b010; // 1
+        we = b1;
+        rc = h3; // Reg[3] = P1State = b01 (Rock)
+        wdsel = b00;
+        game.d = game.USER_SELECTION_IDLE;
+        
+      game.P1_INPUT_PAPER: // Player 1 pressed Paper        
+        alufn = ADD;
+        asel = 3b010; // 0
+        bsel = 3b011; // 2
+        we = b1;
+        rc = h3; // Reg[3] = P1State = b10 (Paper)
+        wdsel = b00;
+        game.d = game.USER_SELECTION_IDLE;
+        
+      game.P1_INPUT_SCISSORS: // Player 1 pressed Scissors        
+        alufn = ADD;
+        asel = 3b010; // 0
+        bsel = 3b100; // 3
+        we = b1;
+        rc = h3; 
+        wdsel = b00; // Reg[3] = P1State = b11 (Scissors)
+        game.d = game.USER_SELECTION_IDLE;
+        
+      game.P2_INPUT_ROCK: // Player 2 pressed Rock        
+        alufn = ADD;
+        asel = 3b010; // 0
+        bsel = 3b010; // 1
+        we = b1;
+        rc = h4; // Reg[4] = P2State = b01 (Rock)
+        wdsel = b00; 
+        game.d = game.USER_SELECTION_IDLE;
+        
+      game.P2_INPUT_PAPER: // Player 2 pressed Paper       
+        alufn = ADD;
+        asel = 3b010; // 0
+        bsel = 3b011; // 2
+        we = b1;
+        rc = h4; // Reg[4] = P2State = b10 (Paper) 
+        wdsel = b00;
+        game.d = game.USER_SELECTION_IDLE;
+        
+      game.P2_INPUT_SCISSORS: // Player 2 pressed Scissors       
+        alufn = ADD;
+        asel = 3b010; // 0
+        bsel = 3b100; // 3
+        we = b1;
+        rc = h4; // Reg[4] = P2State = b11 (Scissors)
+        wdsel = b00;
+        game.d = game.USER_SELECTION_IDLE;
+        
+        
+      // BLUE STATES //
+      game.DECREASE_TIMER: // Decrement timer
+        alufn = SUB;
+        asel = 3b000; // Ra_data
+        bsel = 3b010; // 1
+        we = b1;
+        ra = h2;
+        rc = h2; // Reg[2] = Reg[2]-1
+        wdsel = b00;
+        game.d = game.CHECK_TIMER;
+        
+      game.CHECK_TIMER: // Check if timer > 0
+        alufn = CMPLT;
+        asel = b010; // 0
+        bsel = b000; // Rb_data = timer
+        we = b1;
+        rb = h2; // Get time remaining
+        rc = hf; // Save comparison result (0 < timer) to Reg[15]
+        wdsel = b00;
+        game.d = game.BRANCH_TIMER;
+        
+      game.BRANCH_TIMER:
+        we = b0;
+        rb = hf; // Load comparison result to rb_data
+        wdsel = b00;
+        
+        if (rb_data) {
+          // 0 < Timer: there is still time left
+          game.d = game.USER_SELECTION_IDLE;
+        }
+        else {
+           //0 >= Timer: time is up 
+          game.d = game.P1_CHECK;
+        }       
+       
+        
+      // PURPLE STATES //
+      game.P1_CHECK: // Check if P1 made RPS selection
+        alufn = COMPEQ;
+        asel = b000; // Ra_data
+        bsel = b001; // 0
+        we = b1;
+        ra = h3; // P1State (RPS selection)
+        rc = hf; // Save comparison result (P1State == 00) to Reg[15]
+        wdsel = b00;
+        game.d = game.BRANCH_P1CHECK;
+        
+      game.BRANCH_P1CHECK:
+        we = b0;
+        rb = hf; // Load comparison result to rb_data
+        wdsel = b00;
+        
+        if (rb_data) {
+          // Player 1 did not make a RPS selection
+          game.d = game.P1_INVALID_P2_CHECK;
+        }
+        else {
+          // Player 1 made a valid RPS selection
+          game.d = game.P1_VALID_P2_CHECK;
+        }
+        
+      game.P1_VALID_P2_CHECK: // P1 made selection, check if P2 made selection
+        alufn = COMPEQ;
+        asel = b000; // Ra_data
+        bsel = b001; // 0
+        we = b1;
+        ra = h4; // P2State (RPS selection)
+        rc = hf; // Save comparison result (P2State == 00) to Reg[15]
+        wdsel = b00;
+        game.d = game.BRANCH_P1VALID_P2CHECK;
+        
+      game.BRANCH_P1VALID_P2CHECK:
+        we = b0;
+        rb = hf; // Load comparison result to rb_data
+        wdsel = b00;
+        
+        if (rb_data) {
+          // P1 made choice but P2 did not: P2 loses round
+          game.d = game.ATTACK_BUTTON;
+        }
+        else {
+          // Both players made their RPS selection
+          game.d = game.CONTEST;
+        }
+        
+      game.P1_INVALID_P2_CHECK: // P1 did NOT make selection, check if P2 made selection
+        alufn = COMPEQ;
+        asel = b000; // ra_data
+        bsel = b001; // 0
+        we = b1;
+        ra = h4; // P2State (RPS selection)
+        rc = hf;
+        wdsel = b00;
+        game.d = game.BRANCH_P1INVALID_P2CHECK;
+        
+      game.BRANCH_P1INVALID_P2CHECK:
+        we = b0;
+        rb = hf; // Load comparison result to rb_data
+        
+        if (rb_data) {
+          // Both players did not make selection: round ends (no changes)
+          game.d = game.DEFEND_BUTTON;
+        }
+        else {
+          // P2 made choice but P1 did not: P1 loses round
+          game.d = game.ATTACK_BUTTON;
+        }
+        
+      game.CONTEST: // Wait for either attack or defend button to be presseds
+        game.d = game.CONTEST; // default loop-back (keep waiting)
+        show_choice = 1;
+        if (attack_button) {
+          // Attack button pressed first: losing player will take damage
+          game.d = game.ATTACK_BUTTON;
+        } 
+        else if (defend_button) {
+          // Defend button pressed first: losing player successfully defends self
+          // No damage taken: proceed to next round
+          game.d = game.DEFEND_BUTTON;
+        }
+        
+      game.ATTACK_BUTTON: // Wait for either attack or defend button to be presseds
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b010; // 1
+        we = b1;
+        rc = h6; // Outcome = 1 ATTACK MODE
+        wdsel = b00;
+        show_choice = 1;
+        game.d = game.CHECK_WINNER;
+      
+      game.DEFEND_BUTTON: // Wait for either attack or defend button to be presseds
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b001; // 0
+        we = b1;
+        rc = h6; // Outcome = 0 DEFEND MODE
+        wdsel = b00;
+        show_choice = 1;
+        game.d = game.ROUND_OVER;
+        
+      game.CHECK_WINNER: // Check who won rock-paper-scissors
+        alufn = CHECKWINNER;
+        asel = b000; // ra_data
+        bsel = b000; // rb_data
+        we = b1;
+        ra = h3; // P1State
+        rb = h4; // P2State
+        rc = hf;
+        wdsel = b00;
+        game.d = game.BRANCH_CHECK_WINNER;
+        
+      game.BRANCH_CHECK_WINNER:
+        we = b0;
+        rb = hf;
+        wdsel = b00;
+        
+        if (rb_data == b01) {
+          // P2 won RPS: P1 loses round
+          game.d = game.P1_LOST_ROUND;
+        }
+        else if(rb_data == b10){
+          // P1 won RPS: P2 loses round
+          game.d = game.P2_LOST_ROUND;
+        }
+        else {
+          game.d = game.ROUND_OVER;
+        }
+        
+      game.P1_LOST_ROUND: // P1 lost round, reduce P1 health
+        alufn = SUB;
+        asel = b000; // ra_data
+        bsel = b010; // 1
+        we = b1;
+        ra = h0; // P1 HP
+        rc = h0; // Reg[0] = Reg[0]-1
+        wdsel = b00; 
+        game.d = game.CHECK_P1_0HP; // Check if P1 is at 0HP
+        
+      game.P2_LOST_ROUND: // P2 lost round, reduce P2 health
+        alufn = SUB;
+        asel = b000; // ra_data
+        bsel = b010; // 1
+        we = b1;
+        ra = h1; // P2 HP
+        rc = h1; // Reg[1] = Reg[1]-1
+        wdsel = b00;     
+        game.d = game.CHECK_P2_0HP; // Check if P2 is at 0HP
+        
+      game.CHECK_P1_0HP: // Check if P1 has 0HP
+        alufn = COMPEQ;
+        asel = b000; // ra_data
+        bsel = b001; // 0
+        we = b1;
+        ra = h0; // P1 HP
+        rc = hf;
+        wdsel = b00;
+        game.d = game.BRANCH_P1_HP;
+        
+      game.CHECK_P2_0HP: // Check if P2 has 0HP
+        alufn = COMPEQ;
+        asel = b000; // ra_data
+        bsel = b001; // 0
+        we = b1;
+        ra = h1; // P2 HP
+        rc = hf;
+        wdsel = b00;
+        game.d = game.BRANCH_P2_HP;
+        
+      game.BRANCH_P1_HP:
+        we = b0;
+        rb = hf;
+        wdsel = b00;
+        
+        if (rb_data) {
+          // P1 has 0 HP: Player 2 wins the game!
+          game.d = game.P2_WIN_GAME;
+        }
+        else {
+          // P1 still has HP: round ends, game continues
+          game.d = game.ROUND_OVER; // NOT game.P2_LOST_ROUND (would subtract HP again)
+        }
+        
+      game.BRANCH_P2_HP:
+        we = b0;
+        rb = hf;
+        wdsel = b00;
+        
+        if (rb_data) {
+          // P2 has 0 HP: Player 1 wins the game!
+          game.d = game.P1_WIN_GAME;
+        }
+        else {
+          // P2 still has HP: round ends, game continues
+          game.d = game.ROUND_OVER;
+        }
+        
+      game.P1_WIN_GAME: // Player 1 wins game (save outcome)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b010; // 1
+        we = b1;
+        rc = h5; // Outcome = 1 (Player 1 wins)
+        wdsel = b00;
+        game.d = game.GAME_OVER;
+        
+      game.P2_WIN_GAME: // Player 1 wins game (save outcome)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b011; // 2
+        we = b1;
+        rc = h5; // Outcome = 2 (Player 2 wins)
+        wdsel = b00;
+        game.d = game.GAME_OVER;
+        
+        
+      // GRAY STATES //  
+      game.GAME_OVER: // Game over, outcome stored in Reg[5]
+        // Game over screen is actually the title screen as well
+        // Game starts when reset button is pushed
+        end_game = 1;
+        game.d = game.GAME_OVER; // Loop until reset
+        
+      game.RESET_P1HP: // Reset P1 HP (to 3HP)
+        // Reach this state from reset
+        // Will start process of resetting all registers
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b100; // 3
+        we = b1;
+        rc = h0; // Reg[0] = P1 HP = 3
+        wdsel = b00;
+        game.d = game.RESET_P2HP;
+        
+      game.RESET_P2HP: // Reset P2 HP (to 3HP)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b100; // 3
+        we = b1;
+        rc = h1; // Reg[1] = P2 HP = 3
+        wdsel = b00;
+        game.d = game.RESET_OUTCOME;
+        
+      game.RESET_OUTCOME: // Reset game outcome (to 0)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b001; // 0
+        we = b1;
+        rc = h5; // Reg[5] = Outcome = 0
+        wdsel = b00;
+        game.d = game.RESET_P1STATE;
+      
+      game.RESET_P1STATE: // Reset P1 RPS selection (unselected = 0)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b001; // 0
+        we = b1;
+        rc = h3; // Reg[3] = P1State = 0
+        wdsel = b00;
+        game.d = game.RESET_P2STATE;
+        
+      game.RESET_P2STATE: // Reset P2 RPS selection (unselected = 0)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b001; // 0
+        we = b1;
+        rc = h4; // Reg[4] = P2State = 0
+        wdsel = b00;
+        game.d = game.RESET_TIMER;       
+        
+      game.RESET_TIMER: // Reset game timer (back to 5 seconds)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b100; // 3
+        we = b1;
+        rc = h2; // Reg[2] = Timer = 3
+        wdsel = b00;
+        game.d = game.START_TIMER;
+        
+      game.START_TIMER:
+        game.d = game.USER_SELECTION_IDLE;
+        
+        
+      // GREEN STATES //
+      game.ROUND_OVER: // Round is over (game is not)
+        // Set a timer for 2 seconds (break before new round)
+        alufn = ADD;
+        asel = b010; // 0
+        bsel = b011; // 2
+        we = b1;
+        rc = h2; // Reg[2] = Timer = 2
+        wdsel = b00;
+        show_choice = 1;
+        end_round_idle = 1;
+        if(st) {
+          game.d = game.POST_ROUND_IDLE;
+        }
+        else {
+          game.d = game.ROUND_OVER;
+        }
+        
+      game.POST_ROUND_IDLE: // Delay before new round
+        // 2 second delay before new round starts
+        we = b0;
+        game.d = game.POST_ROUND_IDLE; // default loop-back
+        show_choice = 1;
+        end_round_idle = 1;
+        if (st) { // 1 second has passed
+          game.d = game.DECREASE_POST_ROUND_TIMER;
+        }
+        
+      game.DECREASE_POST_ROUND_TIMER: // Decrease post-round timer
+        alufn = SUB;
+        asel = b000; // ra_data
+        bsel = b010; // 1
+        we = b1;
+        ra = h2;
+        rc = h2; // Timer = Timer - 1
+        wdsel = b00;
+        game.d = game.CHECK_POST_ROUND_TIMER; // Check if timer is up
+        
+      game.CHECK_POST_ROUND_TIMER: // Check if post-round timer is up
+        alufn = CMPLT;
+        asel = b010; // 0
+        bsel = b000; // rb_data
+        we = b1;
+        rb = h2; // Timer
+        rc = hf;
+        wdsel = b00;
+        game.d = game.BRANCH_POST_ROUND_TIMER;
+        
+      game.BRANCH_POST_ROUND_TIMER:
+        we = b0;
+        rb = hf;
+        wdsel = b00;
+        
+        if (rb_data) {
+          // Timer > 0: there is still time left
+          game.d = game.POST_ROUND_IDLE;
+        }
+        else {
+          // Time is up
+          game.d = game.RESET_OUTCOME; // Reset player states
+        } 
+      game.TIMER_BUFFER_START: // Buffer to improve game play.
+        game.d=game.TIMER_BUFFER_START;
+        if(st) {
+          game.d = game.RESET_P1HP;
+        }
+    }
+    
+    // RESET //
+    // Placed at the bottom for highest priority
+    if (rst | restart_button) {
+      // Reset all registers
+      game.d = game.TIMER_BUFFER_START; // Reset all registers
+    }
+    
+  }
+}

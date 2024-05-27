@@ -1,0 +1,52 @@
+module regfile_memory (
+    input clk,  // clock
+    input rst,  // reset
+    input read_address_1[4], // Ra
+    input read_address_2[4], // Rb
+    input write_address[4], // Rc
+    input write_data[16], // WD
+    input write_enable, // WE
+    output reg_data_1[16], // Ra data
+    output reg_data_2[16], // Rb data
+    output timer[4], // Timer LED
+    output p1_health[2], // P1 health LED
+    output p2_health[2], // P2 health LED
+    output p1_state[2],
+    output p2_state[2],
+    output winner[2],
+    output attack_mode[1]
+  ) {
+  
+  // REGFILE contains 16 16-bit registers (4-bit addressable)
+  dff registers[16][16](#INIT(16x{{16h0}}), .clk(clk), .rst(rst));
+  
+  // REGFILE Addresses:
+  // 0x0: P1 HP
+  // 0x1: P2 HP
+  // 0x2: Time remaining
+  // 0x3: P1 selection (rock, paper, scissors)
+  // 0x4: P2 selection
+  // 0x5: Final Outcome of RPS game
+  // 0x6 to 0xE: Temp Regs
+  // 0xF: Temporarily store comparison result
+
+  always {
+    // Output read ports
+    reg_data_1 = registers.q[read_address_1];
+    reg_data_2 = registers.q[read_address_2];
+    
+    // Write port
+    if (write_enable == 1b1) {
+      registers.d[write_address] = write_data;
+    }
+    
+    // data outputs
+    timer = registers.q[2][3:0];
+    p1_health = registers.q[0][1:0];
+    p2_health = registers.q[1][1:0];
+    p1_state = registers.q[3][1:0];
+    p2_state = registers.q[4][1:0];
+    winner = registers.q[5][1:0];
+    attack_mode = registers.q[6][0];
+  }
+}

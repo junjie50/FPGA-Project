@@ -1,0 +1,191 @@
+module fsm_beta (
+    input clk,  // clock
+    input rst,  // reset
+    
+    input restart_button,
+    input attack_button,
+    input defend_button,
+    input p1_rock_button,
+    input p1_paper_button,
+    input p1_scissors_button,
+    input p2_rock_button,
+    input p2_paper_button,
+    input p2_scissors_button,
+    
+    output p1_rock_led,
+    output p1_paper_led,
+    output p1_scissors_led,
+    output p2_rock_led,
+    output p2_paper_led,
+    output p2_scissors_led,
+    output p1_hp[3],
+    output p2_hp[3],
+    output seven_seg_out[7]
+  ) {
+  
+  seven_seg seven_seg;
+  seven_seg_end_game seven_seg_end_game;
+  counter seven_seg_counter(#SIZE(3), #TOP(5), .rst(rst));
+  
+  counter slowclock(#SIZE(1),#DIV(26), .clk(clk),.rst(rst)); // Declare a slower counter
+  counter healthblinkclock(#SIZE(1),#DIV(23), .clk(clk), .rst(rst)); // Declare a slower counter
+  counter sevensegfinalclock(#SIZE(1),#DIV(21), .clk(clk), .rst(rst)); // Declare a slower counter
+  alu alu;
+  control_unit cu(.clk(clk), .rst(rst));
+  regfile_unit reg_file(.clk(clk), .rst(rst));
+  
+  edge_detector slowClockEdge(#RISE(1), #FALL(0), .clk(clk));
+  edge_detector healthBlinkClockEdge(#RISE(1), #FALL(0), .clk(clk));
+  edge_detector sevensegfinalClockEdge(#RISE(1), #FALL(0), .clk(clk));
+  dff blink(#INIT(0),.clk(clk), .rst(rst));
+  dff healthBlink(#INIT(0),.clk(clk), .rst(rst));
+  
+  check_winner winner;
+
+  always {
+    // clocks
+    slowClockEdge.in = slowclock.value;
+    healthBlinkClockEdge.in = healthblinkclock.value;
+    sevensegfinalClockEdge.in = sevensegfinalclock.value;
+    seven_seg_counter.clk = sevensegfinalClockEdge.out;
+    
+    // Initialize input
+    cu.p2_scissors_button = p2_scissors_button;
+    cu.p2_paper_button = p2_paper_button;
+    cu.p2_rock_button = p2_rock_button;
+    cu.p1_scissors_button = p1_scissors_button;
+    cu.p1_paper_button = p1_paper_button;
+    cu.p1_rock_button = p1_rock_button;
+    cu.attack_button = attack_button;
+    cu.defend_button = defend_button;
+    cu.restart_button = restart_button;
+    cu.rb_data = reg_file.rb_data;
+    cu.st = slowClockEdge.out;
+    
+    // Connecting reg_file with logic.
+    reg_file.ra = cu.ra;
+    reg_file.rb = cu.rb;
+    reg_file.rc = cu.rc;
+    reg_file.werf = cu.we;
+    
+    
+    //***ALU***//
+    alu.alufn_signal = cu.alufn;
+    case(cu.asel) {
+      // ASEL mux logic
+      3b000:
+        alu.a = reg_file.ra_data;
+      3b001:
+        alu.a = 16d5; // constant 5 (for timer reset)
+      3b010:
+        alu.a = 16d0; // constant 0
+      default:
+        alu.a = 0; // default case to silence warnings
+     }
+    
+    case(cu.bsel) {
+      // BSEL mux logic
+      3b000:
+        alu.b = reg_file.rb_data;
+      3b001:
+        alu.b = 16d0;
+      3b010:
+        alu.b = 16d1;
+      3b011:
+        alu.b = 16d2;
+      3b100:
+        alu.b = 16d3;
+      default:
+        alu.b = 0; // default case to silence warnings
+    }
+    
+    
+    case(cu.wdsel) {
+      // WDSEL mux logic (determines what is written to Rc)
+      2b00:
+        reg_file.write_data = alu.out;
+      2b01:
+        reg_file.write_data = 16d1;
+      2b10:
+        reg_file.write_data = 16d2;
+      default:
+        reg_file.write_data = 0; // default case to silence warnings
+    }
+    
+    
+    // Output of the led 
+    if(slowClockEdge.out){
+      blink.d = ~blink.q;
+    }
+    
+    if(healthBlinkClockEdge.out){
+      healthBlink.d = ~healthBlink.q;
+    }
+    
+    winner.state_a = reg_file.p1_state;
+    winner.state_b = reg_file.p2_state;
+    
+    p1_rock_led = reg_file.state_led1[2] & cu.show_choice;
+    p1_paper_led = reg_file.state_led1[1] & cu.show_choice;
+    p1_scissors_led = reg_file.state_led1[0] & cu.show_choice;
+    p2_rock_led = reg_file.state_led2[2] & cu.show_choice;
+    p2_paper_led = reg_file.state_led2[1] & cu.show_choice;
+    p2_scissors_led = reg_file.state_led2[0] & cu.show_choice;
+    p1_hp = reg_file.p1_led;
+    p2_hp = reg_file.p2_led;
+    
+    seven_seg.char = reg_file.timer_led;
+    seven_seg_out = seven_seg.segs;
+    
+    seven_seg_end_game.char = seven_seg_counter.value;
+    
+    if(cu.end_round_idle & reg_file.attack_mode) { // end of a single round display.
+      case (winner.out){
+        b10:
+          if(reg_file.p2_led == b110) {
+            p2_hp[0] = healthBlink.q;
+          }
+          else if(reg_file.p2_led == b100) {
+            p2_hp[1] = healthBlink.q;
+          }
+          else{
+            p2_hp[2] = healthBlink.q;
+          }
+        b01:
+          if(reg_file.p1_led == b110) {
+            p1_hp[0] = healthBlink.q;
+          }
+          else if(reg_file.p1_led == b100) {
+            p1_hp[1] = healthBlink.q;
+          }
+          else{
+            p1_hp[2] = healthBlink.q;
+          }
+      }
+    }
+    else if (cu.end_game){ // end game display
+      seven_seg_out = seven_seg_end_game.segs;
+      case(reg_file.winner) {
+        b10:
+          p1_rock_led = 0;
+          p1_paper_led =  0;
+          p1_scissors_led =  0;
+          p2_rock_led = blink.q;
+          p2_paper_led =  blink.q;
+          p2_scissors_led =  blink.q;
+          p1_hp = reg_file.p1_led & 3x{blink.q};
+          p2_hp = reg_file.p2_led & 3x{blink.q};
+        b01:
+          p1_rock_led = blink.q;
+          p1_paper_led =  blink.q;
+          p1_scissors_led =  blink.q;
+          p2_rock_led = 0;
+          p2_paper_led =  0;
+          p2_scissors_led =  0;
+          p1_hp = reg_file.p1_led & 3x{blink.q};
+          p2_hp = reg_file.p2_led & 3x{blink.q};
+          
+      }
+    }
+  }
+}

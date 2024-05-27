@@ -1,0 +1,17 @@
+module seven_seg_end_game (
+    input char[3],
+    output segs[7]
+  ) {
+
+  always {
+    case (char) {
+      0: segs = 7b0000011;
+      1: segs = 7b0000110;
+      2: segs = 7b0001100;
+      3: segs = 7b0011000;
+      4: segs = 7b0110000;
+      5: segs = 7b0100001;
+      default: segs = 7b0000000;
+    }
+  }
+}

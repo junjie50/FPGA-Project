@@ -1,0 +1,22 @@
+module x_bit_left_shifter #(
+  // parameter declaration, to be set during module instantiation
+  // default value given is 8
+  SHIFT = 8 : SHIFT > -1 & SHIFT < 16
+  )(
+    input a[16],
+    input shift,
+    input pad,
+    output out[16]
+  ) {
+  
+  
+  always {
+    case(shift){
+    b1:
+      out[15:SHIFT] = a[15-SHIFT:0];
+      out[SHIFT-1:0] = SHIFTx{pad};
+    default:
+      out = a;        
+    }
+  }
+}

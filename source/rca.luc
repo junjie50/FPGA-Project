@@ -1,0 +1,22 @@
+module rca (
+    input a[16],
+    input b[16],
+    input ci,
+    output s[16]
+  ) {
+  fa fa[16];
+  always {
+    
+    // Connect th fa.a with a since they are same dimension.
+    fa.a = a;
+    fa.b = b;
+    
+    // Connecting the ci with the co.
+    fa.ci[15:1] = fa.co[14:0];
+    
+    // First co.
+    fa.ci[0] = ci;
+    
+    s = fa.so; // connect the output bits
+  }
+}

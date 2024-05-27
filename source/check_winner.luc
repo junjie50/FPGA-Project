@@ -1,0 +1,49 @@
+module check_winner (
+    input state_a[2],
+    input state_b[2],
+    output out[2]
+  ) {
+  // 1 = rock
+  // 2 = paper
+  // 3 = Scissors
+  always {
+    out = b00;
+    case(state_a){
+      1:// a rock
+        if(state_b == 2) { // b paper
+          out = b01;
+        }
+        else if(state_b == 3) { // b scissors
+          out = b10;
+        }
+        else if(state_b == 0) { // b no option
+          out = b10;
+        }
+      2: // a paper
+        if(state_b == 1) {
+          out = b10;
+        }
+        else if(state_b == 3) {
+          out = b01;
+        }
+        else if(state_b == 0) {
+          out = b10;
+        }
+      3: // a scissors
+        if(state_b == 2) {
+          out = b10;
+        }
+        else if(state_b == 1) {
+          out = b01;
+        }
+        else if(state_b == 0) {
+          out = b10;
+        }
+      default:
+        if(state_b != 0) {
+          out = b01;
+        }
+  }
+      
+  }
+}

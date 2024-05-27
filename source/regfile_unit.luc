@@ -1,0 +1,91 @@
+module regfile_unit (
+    input clk,  // clock
+    input rst,  // reset
+   
+    input ra[4],
+    input rb[4],
+    output ra_data[16],
+    output rb_data[16],
+    
+    input werf,
+    input rc[4],
+    input write_data[16],
+    
+    output p1_led[3],
+    output p2_led[3],
+    output p1_state[2],
+    output p2_state[2],
+    output state_led1[3],
+    output state_led2[3],
+    output timer_led[4],
+    output winner[2],
+    output attack_mode[1]
+  ) {
+  
+  regfile_memory regfile(.clk(clk), .rst(rst));
+
+  always {
+    
+    //***REGFILE***//
+    regfile.read_address_1 = ra;
+    regfile.read_address_2 = rb;
+    ra_data = regfile.reg_data_1;
+    rb_data = regfile.reg_data_2;
+    
+    regfile.write_address = rc;
+    regfile.write_enable = werf;
+    regfile.write_data = write_data;
+    
+    case (regfile.p1_health) {
+      1:
+        p1_led = 3b100;
+      2:
+        p1_led = 3b110;
+      3:
+        p1_led = 3b111;
+      default:
+        p1_led = 3b000;
+    }
+    
+    case (regfile.p2_health) {
+      1:
+        p2_led = 3b100;
+      2:
+        p2_led = 3b110;
+      3:
+        p2_led = 3b111;
+      default:
+        p2_led = 3b000;
+    }
+    
+    case (regfile.p1_state) {
+      1:
+        state_led1=3b100;
+      2:
+        state_led1=3b010;
+      3:
+        state_led1=3b001;
+      default:
+        state_led1=3b000;
+    }
+    
+    case (regfile.p2_state) {
+      1:
+        state_led2=3b100;
+      2:
+        state_led2=3b010;
+      3:
+        state_led2=3b001;
+      default:
+        state_led2=3b000;
+    }
+    timer_led = regfile.timer;
+    winner = regfile.winner;
+    
+    p1_state = regfile.p1_state;
+    p2_state = regfile.p2_state;
+    
+    attack_mode = regfile.attack_mode;
+    
+  }
+}
